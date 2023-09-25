@@ -101,9 +101,9 @@ int main(int argc, char** argv) {
     tf2_ros::Buffer buffer(ros::Duration(10));
     tf2_ros::TransformListener tf(buffer);
 
-    costmap_2d::Costmap2DROS lcr("costmap", buffer);
+    costmap_2d::Costmap2DROS lcr("costmap", buffer); //从tf拿costmap
 
-    global_planner::PlannerWithCostmap pppp("planner", &lcr);
+    global_planner::PlannerWithCostmap pppp("planner", &lcr);   //把costmap给到planner
 
     ros::spin();
     return 0;

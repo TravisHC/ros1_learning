@@ -96,6 +96,13 @@ bool DijkstraExpansion::calculatePotentials(unsigned char* costs, double start_x
 
     if(precise_)
     {
+        /* c为当前点，o为push的邻节点, precise_为true时，将如下所示的8个邻节点都push进去
+              o o
+            o c x o
+            o x x o
+              o o 
+        */
+
         double dx = start_x - (int)start_x, dy = start_y - (int)start_y;
         dx = floorf(dx * 100 + 0.5) / 100;
         dy = floorf(dy * 100 + 0.5) / 100;
@@ -114,6 +121,11 @@ bool DijkstraExpansion::calculatePotentials(unsigned char* costs, double start_x
         push_cur(k+nx_*2);
         push_cur(k+nx_*2+1);
     }else{
+        /* c为当前点，o为push的邻节点，precise_为false时，只是简单地将上下左右4个邻节点push进去
+              o
+            o c o
+              o
+        */
         potential[k] = 0;
         push_cur(k+1);
         push_cur(k-1);
