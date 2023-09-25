@@ -81,6 +81,6 @@
         "queue": "cpp"
     },
     "ros.distro": "noetic",
-    "cmake.sourceDirectory": "${workspaceFolder}/cartographer/abseil-cpp/absl/time",
+    "cmake.sourceDirectory": "/home/travis/code/ros1_learning/navigation/amcl",
     "C_Cpp.errorSquiggles": "disabled"
 }
