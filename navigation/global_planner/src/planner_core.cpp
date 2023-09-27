@@ -36,7 +36,7 @@
  *         David V. Lu!!
  *********************************************************************/
 #include <global_planner/planner_core.h>
-#include <pluginlib/class_list_macros.hpp>
+#include <pluginlib/class_list_macros.h>
 #include <costmap_2d/cost_values.h>
 #include <costmap_2d/costmap_2d.h>
 
@@ -109,28 +109,34 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
 
         bool use_quadratic;
         private_nh.param("use_quadratic", use_quadratic, true);
+        // 根据选择new出对应的p_calc_实例. 计算“一个点”的可行性
         if (use_quadratic)
-            p_calc_ = new QuadraticCalculator(cx, cy);
+            p_calc_ = new QuadraticCalculator(cx, cy); // 使用二次差值近似的potential
         else
-            p_calc_ = new PotentialCalculator(cx, cy);
+            p_calc_ = new PotentialCalculator(cx, cy); //
 
         bool use_dijkstra;
         private_nh.param("use_dijkstra", use_dijkstra, true);
+        // 根据选择new出对应的planner实例. 计算“所有”的可行点
         if (use_dijkstra)
         {
+            // dijkstra算法
             DijkstraExpansion* de = new DijkstraExpansion(p_calc_, cx, cy);
             if(!old_navfn_behavior_)
                 de->setPreciseStart(true);
             planner_ = de;
         }
         else
-            planner_ = new AStarExpansion(p_calc_, cx, cy);
+            planner_ = new AStarExpansion(p_calc_, cx, cy);   // A*算法
 
         bool use_grid_path;
         private_nh.param("use_grid_path", use_grid_path, false);
+        // 路径方法，new出path_maker_实例。从可行点中提取路径
         if (use_grid_path)
+            // 栅格路径，从终点开始找上下或左右4个中最小的栅格直到起点
             path_maker_ = new GridPath(p_calc_);
         else
+            // 梯度路径，从周围八个栅格中找到下降梯度最大的点
             path_maker_ = new GradientPath(p_calc_);
 
         orientation_filter_ = new OrientationFilter();
@@ -149,8 +155,8 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
         make_plan_srv_ = private_nh.advertiseService("make_plan", &GlobalPlanner::makePlanService, this);
 
         dsrv_ = new dynamic_reconfigure::Server<global_planner::GlobalPlannerConfig>(ros::NodeHandle("~/" + name));
-        dynamic_reconfigure::Server<global_planner::GlobalPlannerConfig>::CallbackType cb =
-                [this](auto& config, auto level){ reconfigureCB(config, level); };
+        dynamic_reconfigure::Server<global_planner::GlobalPlannerConfig>::CallbackType cb = boost::bind(
+                &GlobalPlanner::reconfigureCB, this, _1, _2);
         dsrv_->setCallback(cb);
 
         initialized_ = true;
@@ -215,28 +221,32 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     return makePlan(start, goal, default_tolerance_, plan);
 }
 
+// 两个步骤完成路径的生成：
+//  1. 计算可行点矩阵potential_array (planner_->calculatePotentials)
+//  2. 从可行点矩阵中提取路径plan (path_maker_->getPath)）
 bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan) {
     boost::mutex::scoped_lock lock(mutex_);
+    // step 1: 是否已经初始化
     if (!initialized_) {
         ROS_ERROR(
                 "This planner has not been initialized yet, but it is being used, please call initialize() before use");
         return false;
     }
 
-    //clear the plan, just in case
+    // 清空路径
     plan.clear();
 
     ros::NodeHandle n;
     std::string global_frame = frame_id_;
 
-    //until tf can handle transforming things that are way in the past... we'll require the goal to be in our global frame
+    // step 2.1 目标点的坐标系应该和全局坐标系一致
     if (goal.header.frame_id != global_frame) {
         ROS_ERROR(
                 "The goal pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", global_frame.c_str(), goal.header.frame_id.c_str());
         return false;
     }
-
+    // step 2.2 起始点的坐标系应该和全局坐标系一致
     if (start.header.frame_id != global_frame) {
         ROS_ERROR(
                 "The start pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", global_frame.c_str(), start.header.frame_id.c_str());
@@ -248,9 +258,9 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     unsigned int start_x_i, start_y_i, goal_x_i, goal_y_i;
     double start_x, start_y, goal_x, goal_y;
-
+    // step 3 判断起始点和目标点是否超出了全局代价地图的范围
     if (!costmap_->worldToMap(wx, wy, start_x_i, start_y_i)) {
-        ROS_WARN_THROTTLE(1.0,
+        ROS_WARN(
                 "The robot's start position is off the global costmap. Planning will always fail, are you sure the robot has been properly localized?");
         return false;
     }
@@ -276,12 +286,12 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         worldToMap(wx, wy, goal_x, goal_y);
     }
 
-    //clear the starting cell within the costmap because we know it can't be an obstacle
+    // step 4 清除起始单元格，它不可能是障碍物
     clearRobotCell(start, start_x_i, start_y_i);
 
     int nx = costmap_->getSizeInCellsX(), ny = costmap_->getSizeInCellsY();
 
-    //make sure to resize the underlying array that Navfn uses
+    // step 5 确保global_planner用的数组大小和地图一致
     p_calc_->setSize(nx, ny);
     planner_->setSize(nx, ny);
     path_maker_->setSize(nx, ny);
@@ -289,7 +299,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     if(outline_map_)
         outlineMap(costmap_->getCharMap(), nx, ny, costmap_2d::LETHAL_OBSTACLE);
-
+    // step 6 核心步骤， 计算出potential_array_
     bool found_legal = planner_->calculatePotentials(costmap_->getCharMap(), start_x, start_y, goal_x, goal_y,
                                                     nx * ny * 2, potential_array_);
 
@@ -299,9 +309,9 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         publishPotential(potential_array_);
 
     if (found_legal) {
-        //extract the plan
+        // step 7 提取全局路径，用path_maker_->getPath得到路径
         if (getPlanFromPotential(start_x, start_y, goal_x, goal_y, goal, plan)) {
-            //make sure the goal we push on has the same timestamp as the rest of the plan
+            // 更新目标点的时间戳，和路径的其他点时间戳一致
             geometry_msgs::PoseStamped goal_copy = goal;
             goal_copy.header.stamp = ros::Time::now();
             plan.push_back(goal_copy);
@@ -309,13 +319,13 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
             ROS_ERROR("Failed to get a plan from potential when a legal potential was found. This shouldn't happen.");
         }
     }else{
-        ROS_ERROR_THROTTLE(5.0, "Failed to get a plan.");
+        ROS_ERROR("Failed to get a plan.");
     }
 
-    // add orientations if needed
+    //  step 8 给路径添加方向
     orientation_filter_->processPath(start, plan);
 
-    //publish the plan for visualization purposes
+    // 发布路径和可视化
     publishPlan(plan);
     delete[] potential_array_;
     return !plan.empty();
@@ -354,20 +364,21 @@ bool GlobalPlanner::getPlanFromPotential(double start_x, double start_y, double 
 
     std::string global_frame = frame_id_;
 
-    //clear the plan, just in case
+    // 清空路径
     plan.clear();
 
     std::vector<std::pair<float, float> > path;
-
+    // 这个path的点只有在map中的位置信息(x,y)
     if (!path_maker_->getPath(potential_array_, start_x, start_y, goal_x, goal_y, path)) {
         ROS_ERROR("NO PATH!");
         return false;
     }
 
     ros::Time plan_time = ros::Time::now();
+    // 将path中每个点转换到world下，方向信息还没加入，这里统一设为零，然后依次存储到plan中
     for (int i = path.size() -1; i>=0; i--) {
         std::pair<float, float> point = path[i];
-        //convert the plan to world coordinates
+        // 把map的全局路径转换到world下
         double world_x, world_y;
         mapToWorld(point.first, point.second, world_x, world_y);
 

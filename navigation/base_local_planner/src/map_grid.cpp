@@ -42,7 +42,7 @@ namespace base_local_planner{
   {
   }
 
-  MapGrid::MapGrid(unsigned int size_x, unsigned int size_y) 
+  MapGrid::MapGrid(unsigned int size_x, unsigned int size_y)
     : size_x_(size_x), size_y_(size_y)
   {
     commonInit();
@@ -55,12 +55,12 @@ namespace base_local_planner{
   }
 
   void MapGrid::commonInit(){
-    //don't allow construction of zero size grid
+    // 不可以构造大小为零的网格
     ROS_ASSERT(size_y_ != 0 && size_x_ != 0);
 
     map_.resize(size_y_ * size_x_);
 
-    //make each cell aware of its location in the grid
+    // 计算每个单元格在网格的位置
     for(unsigned int i = 0; i < size_y_; ++i){
       for(unsigned int j = 0; j < size_x_; ++j){
         unsigned int id = size_x_ * i + j;
@@ -103,7 +103,7 @@ namespace base_local_planner{
   inline bool MapGrid::updatePathCell(MapCell* current_cell, MapCell* check_cell,
       const costmap_2d::Costmap2D& costmap){
 
-    //if the cell is an obstacle set the max path distance
+    // 如果单元格是障碍物，路径距离设为最大
     unsigned char cost = costmap.getCost(check_cell->cx, check_cell->cy);
     if(! getCell(check_cell->cx, check_cell->cy).within_robot &&
         (cost == costmap_2d::LETHAL_OBSTACLE ||
@@ -174,7 +174,7 @@ namespace base_local_planner{
 
     bool started_path = false;
 
-    queue<MapCell*> path_dist_queue;
+    queue<MapCell*> path_dist_queue; // 路径长度的队列
 
     std::vector<geometry_msgs::PoseStamped> adjusted_global_plan;
     adjustPlanResolution(global_plan, adjusted_global_plan, costmap.getResolution());
@@ -218,7 +218,7 @@ namespace base_local_planner{
     std::vector<geometry_msgs::PoseStamped> adjusted_global_plan;
     adjustPlanResolution(global_plan, adjusted_global_plan, costmap.getResolution());
 
-    // skip global path points until we reach the border of the local map
+    //  依次遍历路径点，直到局部地图的边缘或者最后一个点
     for (unsigned int i = 0; i < adjusted_global_plan.size(); ++i) {
       double g_x = adjusted_global_plan[i].pose.position.x;
       double g_y = adjusted_global_plan[i].pose.position.y;
@@ -228,7 +228,7 @@ namespace base_local_planner{
         local_goal_y = map_y;
         started_path = true;
       } else {
-        if (started_path) {
+        if (started_path) { // 路径起始点在局部地图中，但是后面的点有的不在
           break;
         }// else we might have a non pruned path, so we just continue
       }

@@ -48,7 +48,7 @@
 
 #include <ros/console.h>
 
-#include <pluginlib/class_list_macros.hpp>
+#include <pluginlib/class_list_macros.h>
 
 #include <base_local_planner/goal_functions.h>
 #include <nav_msgs/Path.h>
@@ -56,7 +56,7 @@
 #include <nav_core/parameter_magic.h>
 #include <tf2/utils.h>
 
-//register this planner as a BaseLocalPlanner plugin
+//register this planner as a BaseLocalPlanner plugin 注册局部规划器为一个插件
 PLUGINLIB_EXPORT_CLASS(base_local_planner::TrajectoryPlannerROS, nav_core::BaseLocalPlanner)
 
 namespace base_local_planner {
@@ -64,7 +64,7 @@ namespace base_local_planner {
   void TrajectoryPlannerROS::reconfigureCB(BaseLocalPlannerConfig &config, uint32_t level) {
       if (setup_ && config.restore_defaults) {
         config = default_config_;
-        //Avoid looping
+        //Avoid looping 避免循环
         config.restore_defaults = false;
       }
       if ( ! setup_) {
@@ -174,7 +174,7 @@ namespace base_local_planner {
                                                                   "goal_distance_bias",
                                                                   "gdist_scale",
                                                                   0.6);
-      // values of the deprecated params need to be applied to the current params, as defaults 
+      // values of the deprecated params need to be applied to the current params, as defaults
       // of defined for dynamic reconfigure will override them otherwise.
       if (private_nh.hasParam("pdist_scale") & !private_nh.hasParam("path_distance_bias"))
       {
@@ -237,7 +237,7 @@ namespace base_local_planner {
 
       simple_attractor = false;
 
-      //parameters for using the freespace controller
+      //parameters for using the freespace controller 自由空间的局部规划器参数设置
       double min_pt_separation, max_obstacle_height, grid_resolution;
       private_nh.param("point_grid/max_sensor_range", max_sensor_range_, 2.0);
       private_nh.param("point_grid/min_pt_separation", min_pt_separation, 0.01);
@@ -256,15 +256,11 @@ namespace base_local_planner {
           max_vel_x, min_vel_x, max_vel_th_, min_vel_th_, min_in_place_vel_th_, backup_vel,
           dwa, heading_scoring, heading_scoring_timestep, meter_scoring, simple_attractor, y_vels, stop_time_buffer, sim_period_, angular_sim_granularity);
 
-      map_viz_.initialize(name,
-                          global_frame_,
-                          [this](int cx, int cy, float &path_cost, float &goal_cost, float &occ_cost, float &total_cost){
-                              return tc_->getCellCosts(cx, cy, path_cost, goal_cost, occ_cost, total_cost);
-                          });
+      map_viz_.initialize(name, global_frame_, boost::bind(&TrajectoryPlanner::getCellCosts, tc_, _1, _2, _3, _4, _5, _6));
       initialized_ = true;
 
       dsrv_ = new dynamic_reconfigure::Server<BaseLocalPlannerConfig>(private_nh);
-      dynamic_reconfigure::Server<BaseLocalPlannerConfig>::CallbackType cb = [this](auto& config, auto level){ reconfigureCB(config, level); };
+      dynamic_reconfigure::Server<BaseLocalPlannerConfig>::CallbackType cb = boost::bind(&TrajectoryPlannerROS::reconfigureCB, this, _1, _2);
       dsrv_->setCallback(cb);
 
     } else {
@@ -348,13 +344,15 @@ namespace base_local_planner {
         std::min(-1.0 * min_in_place_vel_th_, ang_diff));
 
     //take the acceleration limits of the robot into account
+    // 考虑机器人的加速度限制
     double max_acc_vel = fabs(vel_yaw) + acc_lim_theta_ * sim_period_;
     double min_acc_vel = fabs(vel_yaw) - acc_lim_theta_ * sim_period_;
 
     v_theta_samp = sign(v_theta_samp) * std::min(std::max(fabs(v_theta_samp), min_acc_vel), max_acc_vel);
 
     //we also want to make sure to send a velocity that allows us to stop when we reach the goal given our acceleration limits
-    double max_speed_to_stop = sqrt(2 * acc_lim_theta_ * fabs(ang_diff)); 
+    // 当然下发速度也要考虑到当机器人到了目标点后能够在满足加速度限制情况下及时刹车
+    double max_speed_to_stop = sqrt(2 * acc_lim_theta_ * fabs(ang_diff));
 
     v_theta_samp = sign(v_theta_samp) * std::min(max_speed_to_stop, fabs(v_theta_samp));
 
@@ -386,12 +384,15 @@ namespace base_local_planner {
     }
 
     //reset the global plan
+    // 重置全局路径
     global_plan_.clear();
     global_plan_ = orig_global_plan;
-    
+
     //when we get a new plan, we also want to clear any latch we may have on goal tolerances
+    // 更新了新的全局路径后，需要清除goal tolearnce的latch
     xy_tolerance_latch_ = false;
     //reset the at goal flag
+    // 重置到达目标点的标志
     reached_goal_ = false;
     return true;
   }
@@ -404,18 +405,19 @@ namespace base_local_planner {
 
     std::vector<geometry_msgs::PoseStamped> local_plan;
     geometry_msgs::PoseStamped global_pose;
+    // step 1 获得机器人当前位姿
     if (!costmap_ros_->getRobotPose(global_pose)) {
       return false;
     }
 
     std::vector<geometry_msgs::PoseStamped> transformed_plan;
-    //get the global plan in our frame
+    // step 2 获得controller坐标系下的全局路径
     if (!transformGlobalPlan(*tf_, global_plan_, global_pose, *costmap_, global_frame_, transformed_plan)) {
       ROS_WARN("Could not transform the global plan to the frame of the controller");
       return false;
     }
 
-    //now we'll prune the plan based on the position of the robot
+    // step 3 根据机器人的当前位置修剪全局路径,去除走过的路径
     if(prune_plan_)
       prunePlan(global_pose, transformed_plan, global_plan_);
 
@@ -431,12 +433,12 @@ namespace base_local_planner {
     gettimeofday(&start, NULL);
     */
 
-    //if the global plan passed in is empty... we won't do anything
+    // 如果全局路径是空，不做任何的操作
     if(transformed_plan.empty())
       return false;
 
     const geometry_msgs::PoseStamped& goal_point = transformed_plan.back();
-    //we assume the global goal is the last point in the global plan
+    // step 4 假设目标点是全局路径的最后一个点
     const double goal_x = goal_point.pose.position.x;
     const double goal_y = goal_point.pose.position.y;
 
@@ -444,19 +446,18 @@ namespace base_local_planner {
 
     double goal_th = yaw;
 
-    //check to see if we've reached the goal position
+    // step 5 检查是否已经到了目标点位置
     if (xy_tolerance_latch_ || (getGoalPositionDistance(global_pose, goal_x, goal_y) <= xy_goal_tolerance_)) {
 
-      //if the user wants to latch goal tolerance, if we ever reach the goal location, we'll
-      //just rotate in place
+      // 如果已经到了目标点位置，接下来只用旋转对齐就行了
       if (latch_xy_goal_tolerance_) {
         xy_tolerance_latch_ = true;
       }
 
       double angle = getGoalOrientationAngleDifference(global_pose, goal_th);
-      //check to see if the goal orientation has been reached
+      // 检查机器人是否已经旋转到目标点的朝向
       if (fabs(angle) <= yaw_goal_tolerance_) {
-        //set the velocity command to zero
+        // 设置下发速度为零
         cmd_vel.linear.x = 0.0;
         cmd_vel.linear.y = 0.0;
         cmd_vel.angular.z = 0.0;
@@ -464,23 +465,22 @@ namespace base_local_planner {
         xy_tolerance_latch_ = false;
         reached_goal_ = true;
       } else {
-        //we need to call the next two lines to make sure that the trajectory
-        //planner updates its path distance and goal distance grids
+        // 局部规划器更新路径长度和 goal distance grids
         tc_->updatePlan(transformed_plan);
         Trajectory path = tc_->findBestPath(global_pose, robot_vel, drive_cmds);
         map_viz_.publishCostCloud(costmap_);
 
-        //copy over the odometry information
+        // 获得里程计信息
         nav_msgs::Odometry base_odom;
         odom_helper_.getOdom(base_odom);
 
-        //if we're not stopped yet... we want to stop... taking into account the acceleration limits of the robot
+        // 由于加速度限制机器人想停还没停下来，返回false
         if ( ! rotating_to_goal_ && !base_local_planner::stopped(base_odom, rot_stopped_velocity_, trans_stopped_velocity_)) {
           if ( ! stopWithAccLimits(global_pose, robot_vel, cmd_vel)) {
             return false;
           }
         }
-        //if we're stopped... then we want to rotate to goal
+        // 如果机器人停下来了，然后旋转对齐目标点朝向
         else{
           //set this so that we know its OK to be moving
           rotating_to_goal_ = true;
@@ -490,17 +490,17 @@ namespace base_local_planner {
         }
       }
 
-      //publish an empty plan because we've reached our goal position
+      // 发布空的路径规划因为机器人到了目标点
       publishPlan(transformed_plan, g_plan_pub_);
       publishPlan(local_plan, l_plan_pub_);
 
       //we don't actually want to run the controller when we're just rotating to goal
       return true;
     }
-
+    // step 6 更新trajectory controller的全局路径
     tc_->updatePlan(transformed_plan);
 
-    //compute what trajectory to drive along
+    // step 7 计算机器人应该沿着哪个局部路径走 (核心功能)
     Trajectory path = tc_->findBestPath(global_pose, robot_vel, drive_cmds);
 
     map_viz_.publishCostCloud(costmap_);
@@ -512,12 +512,12 @@ namespace base_local_planner {
     ROS_INFO("Cycle time: %.9f", t_diff);
     */
 
-    //pass along drive commands
+    // step 8 传递速度指令
     cmd_vel.linear.x = drive_cmds.pose.position.x;
     cmd_vel.linear.y = drive_cmds.pose.position.y;
     cmd_vel.angular.z = tf2::getYaw(drive_cmds.pose.orientation);
 
-    //if we cannot move... tell someone
+    // 如果不能动，发出错误信息
     if (path.cost_ < 0) {
       ROS_DEBUG_NAMED("trajectory_planner_ros",
           "The rollout planner failed to find a valid plan. This means that the footprint of the robot was in collision for all simulated trajectories.");
@@ -530,7 +530,7 @@ namespace base_local_planner {
     ROS_DEBUG_NAMED("trajectory_planner_ros", "A valid velocity command of (%.2f, %.2f, %.2f) was found for this cycle.",
         cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z);
 
-    // Fill out the local plan
+    // step 9 把局部路径填入local_plan中
     for (unsigned int i = 0; i < path.getPointsSize(); ++i) {
       double p_x, p_y, p_th;
       path.getPoint(i, p_x, p_y, p_th);
@@ -546,7 +546,7 @@ namespace base_local_planner {
       local_plan.push_back(pose);
     }
 
-    //publish information to the visualizer
+    // step 10 发布信息由于可视化
     publishPlan(transformed_plan, g_plan_pub_);
     publishPlan(local_plan, l_plan_pub_);
     return true;
@@ -616,6 +616,6 @@ namespace base_local_planner {
       return false;
     }
     //return flag set in controller
-    return reached_goal_; 
+    return reached_goal_;
   }
 };

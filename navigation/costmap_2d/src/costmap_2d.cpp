@@ -199,12 +199,21 @@ void Costmap2D::setCost(unsigned int mx, unsigned int my, unsigned char cost)
   costmap_[getIndex(mx, my)] = cost;
 }
 
+
 void Costmap2D::mapToWorld(unsigned int mx, unsigned int my, double& wx, double& wy) const
 {
   wx = origin_x_ + (mx + 0.5) * resolution_;
   wy = origin_y_ + (my + 0.5) * resolution_;
 }
 
+/**
+ * @brief  世界坐标系向map坐标系转换
+ * @param  wx 世界坐标系的x值
+ * @param  wy 世界坐标系的y值
+ * @param  mx 相关map坐标系下的x值
+ * @param  my 相关map坐标系下的y值
+ * @return True if the conversion was successful (legal bounds) false otherwise
+ */
 bool Costmap2D::worldToMap(double wx, double wy, unsigned int& mx, unsigned int& my) const
 {
   if (wx < origin_x_ || wy < origin_y_)
@@ -219,12 +228,14 @@ bool Costmap2D::worldToMap(double wx, double wy, unsigned int& mx, unsigned int&
   return false;
 }
 
+// 从世界坐标（wx, wy）向地图坐标(mx, my)转换,地图没有边界
 void Costmap2D::worldToMapNoBounds(double wx, double wy, int& mx, int& my) const
 {
   mx = (int)((wx - origin_x_) / resolution_);
   my = (int)((wy - origin_y_) / resolution_);
 }
 
+// 从世界坐标（wx, wy）向地图坐标(mx, my)转换,map中强制加入边界
 void Costmap2D::worldToMapEnforceBounds(double wx, double wy, int& mx, int& my) const
 {
   // Here we avoid doing any math to wx,wy before comparing them to
@@ -314,7 +325,7 @@ void Costmap2D::updateOrigin(double new_origin_x, double new_origin_y)
 
 bool Costmap2D::setConvexPolygonCost(const std::vector<geometry_msgs::Point>& polygon, unsigned char cost_value)
 {
-  // we assume the polygon is given in the global_frame... we need to transform it to map coordinates
+  // 机器人footprint的轮廓点全部转到地图坐标系下
   std::vector<MapLocation> map_polygon;
   for (unsigned int i = 0; i < polygon.size(); ++i)
   {
@@ -329,10 +340,10 @@ bool Costmap2D::setConvexPolygonCost(const std::vector<geometry_msgs::Point>& po
 
   std::vector<MapLocation> polygon_cells;
 
-  // get the cells that fill the polygon
+  // 获得填满多边形的单元格
   convexFillCells(map_polygon, polygon_cells);
 
-  // set the cost of those cells
+  // 获取这些内部cell的index，再对地图costmap_ 遍历进行赋值操作
   for (unsigned int i = 0; i < polygon_cells.size(); ++i)
   {
     unsigned int index = getIndex(polygon_cells[i].x, polygon_cells[i].y);
@@ -340,7 +351,7 @@ bool Costmap2D::setConvexPolygonCost(const std::vector<geometry_msgs::Point>& po
   }
   return true;
 }
-
+// 根据轮廓点，就能获得轮廓点连线的全部的边缘点
 void Costmap2D::polygonOutlineCells(const std::vector<MapLocation>& polygon, std::vector<MapLocation>& polygon_cells)
 {
   PolygonOutlineCells cell_gatherer(*this, costmap_, polygon_cells);
@@ -366,6 +377,7 @@ void Costmap2D::convexFillCells(const std::vector<MapLocation>& polygon, std::ve
   polygonOutlineCells(polygon, polygon_cells);
 
   // quick bubble sort to sort points by x
+  // 获得轮廓点之间连线的cell的列表。然后对这些边缘点做一次快速冒泡排序
   MapLocation swap;
   unsigned int i = 0;
   while (i < polygon_cells.size() - 1)
@@ -407,6 +419,7 @@ void Costmap2D::convexFillCells(const std::vector<MapLocation>& polygon, std::ve
     }
 
     i += 2;
+    // 操作完成后得到的polygon_cells 的cell都按照x坐标从小到大排序好了。然后开始沿着x轴，对每个相同的x，检查y值，获取y值最大的和y值最小的polygoncell
     while (i < polygon_cells.size() && polygon_cells[i].x == x)
     {
       if (polygon_cells[i].y < min_pt.y)
@@ -416,6 +429,7 @@ void Costmap2D::convexFillCells(const std::vector<MapLocation>& polygon, std::ve
       ++i;
     }
 
+    // 最后将y最大的和y最小的整个列的所有cell全部都塞进polygon_cells去：
     MapLocation pt;
     // loop though cells in the column
     for (unsigned int y = min_pt.y; y <= max_pt.y; ++y)
