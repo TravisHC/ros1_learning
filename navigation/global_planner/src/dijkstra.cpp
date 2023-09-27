@@ -94,12 +94,14 @@ bool DijkstraExpansion::calculatePotentials(unsigned char* costs, double start_x
     // set goal
     int k = toIndex(start_x, start_y);
 
+    //  当前点的代价值由potential数组维护，push_cur()函数将当前点的邻节点push进去，当前遍历的邻节点用currentBuffer_数组维护，currentEnd_记录该数组的长度？ TODO
+
     if(precise_)
     {
         /* c为当前点，o为push的邻节点, precise_为true时，将如下所示的8个邻节点都push进去
               o o
-            o c x o
-            o x x o
+            o c c o
+            o c c o
               o o 
         */
 
