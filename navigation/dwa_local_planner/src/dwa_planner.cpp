@@ -79,7 +79,7 @@ namespace dwa_local_planner {
     forward_point_distance_ = config.forward_point_distance;
     goal_front_costs_.setXShift(forward_point_distance_);
     alignment_costs_.setXShift(forward_point_distance_);
- 
+
     // obstacle costs can vary due to scaling footprint feature
     obstacle_costs_.setParams(config.max_vel_trans, config.max_scaling_factor, config.scaling_speed);
 
@@ -89,29 +89,29 @@ namespace dwa_local_planner {
     vx_samp = config.vx_samples;
     vy_samp = config.vy_samples;
     vth_samp = config.vth_samples;
- 
+
     if (vx_samp <= 0) {
       ROS_WARN("You've specified that you don't want any samples in the x dimension. We'll at least assume that you want to sample one value... so we're going to set vx_samples to 1 instead");
       vx_samp = 1;
       config.vx_samples = vx_samp;
     }
- 
+
     if (vy_samp <= 0) {
       ROS_WARN("You've specified that you don't want any samples in the y dimension. We'll at least assume that you want to sample one value... so we're going to set vy_samples to 1 instead");
       vy_samp = 1;
       config.vy_samples = vy_samp;
     }
- 
+
     if (vth_samp <= 0) {
       ROS_WARN("You've specified that you don't want any samples in the th dimension. We'll at least assume that you want to sample one value... so we're going to set vth_samples to 1 instead");
       vth_samp = 1;
       config.vth_samples = vth_samp;
     }
- 
+
     vsamples_[0] = vx_samp;
     vsamples_[1] = vy_samp;
     vsamples_[2] = vth_samp;
- 
+
 
   }
 
@@ -154,32 +154,27 @@ namespace dwa_local_planner {
 
 
     private_nh.param("publish_cost_grid_pc", publish_cost_grid_pc_, false);
-    map_viz_.initialize(name,
-                        planner_util->getGlobalFrame(),
-                        [this](int cx, int cy, float &path_cost, float &goal_cost, float &occ_cost, float &total_cost){
-                          return getCellCosts(cx, cy, path_cost, goal_cost, occ_cost, total_cost);
-                        });
+    map_viz_.initialize(name, planner_util->getGlobalFrame(), boost::bind(&DWAPlanner::getCellCosts, this, _1, _2, _3, _4, _5, _6));
 
     private_nh.param("global_frame_id", frame_id_, std::string("odom"));
 
     traj_cloud_pub_ = private_nh.advertise<sensor_msgs::PointCloud2>("trajectory_cloud", 1);
     private_nh.param("publish_traj_pc", publish_traj_pc_, false);
 
-    // set up all the cost functions that will be applied in order
-    // (any function returning negative values will abort scoring, so the order can improve performance)
+    // vector容器依次包含了所有的判断标准对象，如果返回负值将会停止计分，所以这个顺序对性能有很大的影响，可以提高性能
     std::vector<base_local_planner::TrajectoryCostFunction*> critics;
-    critics.push_back(&oscillation_costs_); // discards oscillating motions (assisgns cost -1)
-    critics.push_back(&obstacle_costs_); // discards trajectories that move into obstacles
-    critics.push_back(&goal_front_costs_); // prefers trajectories that make the nose go towards (local) nose goal
-    critics.push_back(&alignment_costs_); // prefers trajectories that keep the robot nose on nose path
-    critics.push_back(&path_costs_); // prefers trajectories on global path
-    critics.push_back(&goal_costs_); // prefers trajectories that go towards (local) goal, based on wave propagation
-    critics.push_back(&twirling_costs_); // optionally prefer trajectories that don't spin
+    critics.push_back(&oscillation_costs_); // discards oscillating motions (assisgns cost -1) 丢弃来回不稳定的运动
+    critics.push_back(&obstacle_costs_); // discards trajectories that move into obstacles 丢弃向障碍物运动的轨迹
+    critics.push_back(&goal_front_costs_); // prefers trajectories that make the nose go towards (local) nose goal 优先选择朝向目标点运动的轨迹
+    critics.push_back(&alignment_costs_); // prefers trajectories that keep the robot nose on nose path 优先选择让机器人朝向和路径方向保持一致的轨迹
+    critics.push_back(&path_costs_); // prefers trajectories on global path 优先选择更趋于跟随全局路径的轨迹
+    critics.push_back(&goal_costs_); // prefers trajectories that go towards (local) goal, based on wave propagation 优先选择朝向目标点运动的轨迹
+    critics.push_back(&twirling_costs_); // optionally prefer trajectories that don't spin 选择性的优先挑取不spin的轨迹
 
-    // trajectory generators
+    // 产生轨迹
     std::vector<base_local_planner::TrajectorySampleGenerator*> generator_list;
     generator_list.push_back(&generator_);
-
+    // 对所有可能轨迹进行遍历
     scored_sampling_planner_ = base_local_planner::SimpleScoredSamplingPlanner(generator_list, critics);
 
     private_nh.param("cheat_factor", cheat_factor_, 1.0);
@@ -248,13 +243,13 @@ namespace dwa_local_planner {
     for (unsigned int i = 0; i < new_plan.size(); ++i) {
       global_plan_[i] = new_plan[i];
     }
-
+    // obstacle_costs_是 ObstacleCostFunction的对象
     obstacle_costs_.setFootprint(footprint_spec);
 
-    // costs for going away from path
+    // costs for going away from path path_costs_是MapGridCostFunction的对象，成员函数setTargetPoses
     path_costs_.setTargetPoses(global_plan_);
 
-    // costs for not going towards the local goal as much as possible
+    // costs for not going towards the local goal as much as possible  goal_costs_也是MapGridCostFunction的对象
     goal_costs_.setTargetPoses(global_plan_);
 
     // alignment costs
@@ -278,7 +273,7 @@ namespace dwa_local_planner {
       sin(angle_to_goal);
 
     goal_front_costs_.setTargetPoses(front_global_plan);
-    
+
     // keeping the nose on the path
     if (sq_dist > forward_point_distance_ * forward_point_distance_ * cheat_factor_) {
       alignment_costs_.setScale(path_distance_bias_);
@@ -292,14 +287,14 @@ namespace dwa_local_planner {
 
 
   /*
-   * given the current state of the robot, find a good trajectory
+   *  获得机器人当前状态，找到最优局部路径
    */
   base_local_planner::Trajectory DWAPlanner::findBestPath(
       const geometry_msgs::PoseStamped& global_pose,
       const geometry_msgs::PoseStamped& global_vel,
       geometry_msgs::PoseStamped& drive_velocities) {
 
-    //make sure that our configuration doesn't change mid-run
+    // 这里要加锁，避免数据被修改
     boost::mutex::scoped_lock l(configuration_mutex_);
 
     Eigen::Vector3f pos(global_pose.pose.position.x, global_pose.pose.position.y, tf2::getYaw(global_pose.pose.orientation));
@@ -308,16 +303,19 @@ namespace dwa_local_planner {
     Eigen::Vector3f goal(goal_pose.pose.position.x, goal_pose.pose.position.y, tf2::getYaw(goal_pose.pose.orientation));
     base_local_planner::LocalPlannerLimits limits = planner_util_->getCurrentLimits();
 
-    // prepare cost functions and generators for this run
+    // 准备代价函数和轨迹产生器
     generator_.initialise(pos,
         vel,
         goal,
         &limits,
-        vsamples_);
+        vsamples_); // 获取采样速度，generator_是SimpleTrajectoryGenerator的对象
 
+    // 刚开始轨迹设为不可行
     result_traj_.cost_ = -7;
-    // find best trajectory by sampling and scoring the samples
+
+    // 通过采样和样本打分来找到最优轨迹
     std::vector<base_local_planner::Trajectory> all_explored;
+    // 找出最优路径。result_traj_就是最优路径，all_explored是所有路径的表示
     scored_sampling_planner_.findBestTrajectory(result_traj_, &all_explored);
 
     if(publish_traj_pc_)
@@ -362,16 +360,16 @@ namespace dwa_local_planner {
         traj_cloud_pub_.publish(traj_cloud);
     }
 
-    // verbose publishing of point clouds
+    // 发布点云
     if (publish_cost_grid_pc_) {
-      //we'll publish the visualization of the costs to rviz before returning our best trajectory
+      // 在返回最优局部路径之前，rviz中代价的可视化
       map_viz_.publishCostCloud(planner_util_->getCostmap());
     }
 
     // debrief stateful scoring functions
     oscillation_costs_.updateOscillationFlags(pos, &result_traj_, planner_util_->getCurrentLimits().min_vel_trans);
 
-    //if we don't have a legal trajectory, we'll just command zero
+    // 如果没有计算出有效的局部路径，则下发停止命令
     if (result_traj_.cost_ < 0) {
       drive_velocities.pose.position.x = 0;
       drive_velocities.pose.position.y = 0;

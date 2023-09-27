@@ -35,7 +35,7 @@
 * Author: Eitan Marder-Eppstein
 *********************************************************************/
 #include <rotate_recovery/rotate_recovery.h>
-#include <pluginlib/class_list_macros.hpp>
+#include <pluginlib/class_list_macros.h>
 #include <nav_core/parameter_magic.h>
 #include <tf2/utils.h>
 #include <ros/ros.h>
@@ -66,7 +66,7 @@ void RotateRecovery::initialize(std::string name, tf2_ros::Buffer*,
     ros::NodeHandle private_nh("~/" + name);
     ros::NodeHandle blp_nh("~/TrajectoryPlannerROS");
 
-    // we'll simulate every degree by default
+    // 默认会模拟仿真每一度(degree)旋转的情况
     private_nh.param("sim_granularity", sim_granularity_, 0.017);
     private_nh.param("frequency", frequency_, 20.0);
 
@@ -113,6 +113,7 @@ void RotateRecovery::runBehavior()
   local_costmap_->getRobotPose(global_pose);
 
   double current_angle = tf2::getYaw(global_pose.pose.orientation);
+  // step 1 : 恢复前的位姿朝向
   double start_angle = current_angle;
 
   bool got_180 = false;
@@ -121,38 +122,39 @@ void RotateRecovery::runBehavior()
          (!got_180 ||
           std::fabs(angles::shortest_angular_distance(current_angle, start_angle)) > tolerance_))
   {
-    // Update Current Angle
+    // step 2 : while循环中更新当前角度
     local_costmap_->getRobotPose(global_pose);
     current_angle = tf2::getYaw(global_pose.pose.orientation);
 
-    // compute the distance left to rotate
-    double dist_left;
-    if (!got_180)
+
+    double dist_left;   // 剩余向左旋转的距离
+
+    // step 3: 更新dist_left
+    if (!got_180)  // case 1 : 如果没有旋转到半圈
     {
-      // If we haven't hit 180 yet, we need to rotate a half circle plus the distance to the 180 point
+      // 如果没有转到180度，还要旋转 distance_to_180度 + 半圈
       double distance_to_180 = std::fabs(angles::shortest_angular_distance(current_angle, start_angle + M_PI));
       dist_left = M_PI + distance_to_180;
-
+      // 到了误差允许范围
       if (distance_to_180 < tolerance_)
       {
         got_180 = true;
       }
     }
-    else
+    else  // case 2:  旋转有半圈了
     {
-      // If we have hit the 180, we just have the distance back to the start
       dist_left = std::fabs(angles::shortest_angular_distance(current_angle, start_angle));
     }
 
     double x = global_pose.pose.position.x, y = global_pose.pose.position.y;
 
-    // check if that velocity is legal by forward simulating
+    // step 4: 检查该速度下的推算位姿是否有碰撞可能
     double sim_angle = 0.0;
     while (sim_angle < dist_left)
     {
       double theta = current_angle + sim_angle;
 
-      // make sure that the point is legal, if it isn't... we'll abort
+      // 确保这个位姿没有碰撞风险，不然会停止
       double footprint_cost = world_model_->footprintCost(x, y, theta, local_costmap_->getRobotFootprint(), 0.0, 0.0);
       if (footprint_cost < 0.0)
       {
@@ -164,10 +166,10 @@ void RotateRecovery::runBehavior()
       sim_angle += sim_granularity_;
     }
 
-    // compute the velocity that will let us stop by the time we reach the goal
+    // step 5: 计算下发速度，让机器人可以在到达终点时停止
     double vel = sqrt(2 * acc_lim_th_ * dist_left);
 
-    // make sure that this velocity falls within the specified limits
+    // step 6: 确保下发旋转速度满足速度限制要求
     vel = std::min(std::max(vel, min_rotational_vel_), max_rotational_vel_);
 
     geometry_msgs::Twist cmd_vel;

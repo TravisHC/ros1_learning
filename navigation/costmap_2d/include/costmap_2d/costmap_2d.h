@@ -47,6 +47,7 @@ namespace costmap_2d
 {
 
 // convenient for storing x/y point pairs
+// 方便记录位置信息
 struct MapLocation
 {
   unsigned int x;
@@ -62,7 +63,7 @@ class Costmap2D
   friend class CostmapTester;  // Need this for gtest to work correctly
 public:
   /**
-   * @brief  Constructor for a costmap
+   * @brief  构造代价地图
    * @param  cells_size_x The x size of the map in cells
    * @param  cells_size_y The y size of the map in cells
    * @param  resolution The resolution of the map in meters/cell
@@ -140,6 +141,8 @@ public:
    * @param  my Will be set to the associated map y coordinate
    * @return True if the conversion was successful (legal bounds) false otherwise
    */
+  // 作用：从世界坐标(wx, wy)向地图坐标(mx, my)转换,不一定会转换成功，
+  // 地图坐标系小于世界坐标系，如果转换成功（合法界限），则为True；否则为false
   bool worldToMap(double wx, double wy, unsigned int& mx, unsigned int& my) const;
 
   /**
@@ -366,6 +369,7 @@ protected:
       unsigned int abs_dx = abs(dx);
       unsigned int abs_dy = abs(dy);
 
+      // 标记x是前进一格还是后退一个单元格
       int offset_dx = sign(dx);
       int offset_dy = sign(dy) * size_x_;
 
@@ -391,6 +395,7 @@ protected:
 private:
   /**
    * @brief  A 2D implementation of Bresenham's raytracing algorithm... applies an action at each step
+   *  实现了 对于离散的平面点，指定两个点，找到两点之间的其他点，使得这些中间组成一个尽可能趋近直线的点集。
    */
   template<class ActionType>
     inline void bresenham2D(ActionType at, unsigned int abs_da, unsigned int abs_db, int error_b, int offset_a,
@@ -401,7 +406,22 @@ private:
       {
         at(offset);
         offset += offset_a;
-        error_b += abs_db;
+       /*
+         * 下面这个情况，error_b + abs_db就会超过abs_da，所以每次x+1后，y也会+1
+         *         _
+         *       _|
+         *     _|
+         *   _|
+         * _|
+         *
+         * 下面这个情况，error_b + n* abs_db才会超过abs_da,所以每次x+n后，y才会+1
+         *             ___|
+         *         ___|
+         *     ___|
+         * ___|
+          */
+        // https://blog.csdn.net/TurboIan/article/details/86611713
+        error_b += abs_db;  // 为了控制前进上升的斜率
         if ((unsigned int)error_b >= abs_da)
         {
           offset += offset_b;
@@ -418,13 +438,13 @@ private:
 
   mutex_t* access_;
 protected:
-  unsigned int size_x_;
-  unsigned int size_y_;
-  double resolution_;
-  double origin_x_;
-  double origin_y_;
-  unsigned char* costmap_;
-  unsigned char default_value_;
+  unsigned int size_x_;  // 表示x方向最大距离（x方向像素点个数）
+  unsigned int size_y_;  // 表示y方向最大距离（y方向像素点个数）
+  double resolution_;  // 分辨率大小，像素点之间的距离
+  double origin_x_; // 地图的下标计数原点x
+  double origin_y_;  // 地图的下标计数原点y
+  unsigned char* costmap_;  // 地图数据
+  unsigned char default_value_;  // 默认代价值
 
   class MarkCell
   {

@@ -94,16 +94,16 @@ PlannerWithCostmap::PlannerWithCostmap(string name, Costmap2DROS* cmap) :
 }
 
 } // namespace
-
+// 全局规划的入口
 int main(int argc, char** argv) {
     ros::init(argc, argv, "global_planner");
 
     tf2_ros::Buffer buffer(ros::Duration(10));
     tf2_ros::TransformListener tf(buffer);
+    // 声明了costmap_2d::Costmap2DROS的对象
+    costmap_2d::Costmap2DROS lcr("costmap", buffer);
 
-    costmap_2d::Costmap2DROS lcr("costmap", buffer); //从tf拿costmap
-
-    global_planner::PlannerWithCostmap pppp("planner", &lcr);   //把costmap给到planner
+    global_planner::PlannerWithCostmap pppp("planner", &lcr);
 
     ros::spin();
     return 0;

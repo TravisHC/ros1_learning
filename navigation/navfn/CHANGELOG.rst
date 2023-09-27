@@ -2,28 +2,6 @@
 Changelog for package navfn
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-1.17.3 (2023-01-10)
--------------------
-* [ROS-O] various patches (`#1225 <https://github.com/ros-planning/navigation/issues/1225>`_)
-  * do not specify obsolete c++11 standard
-  this breaks with current versions of log4cxx.
-  * update pluginlib include paths
-  the non-hpp headers have been deprecated since kinetic
-  * use lambdas in favor of boost::bind
-  Using boost's _1 as a global system is deprecated since C++11.
-  The ROS packages in Debian removed the implicit support for the global symbols,
-  so this code fails to compile there without the patch.
-* Contributors: Michael Görner
-
-1.17.2 (2022-06-20)
--------------------
-* navfn: stop installing test headers (`#1085 <https://github.com/ros-planning/navigation/issues/1085>`_)
-  The navtest executable is only built if FLTK is installed. However, the
-  header it uses is installed regardless, and requires FLTK. Nothing else
-  uses this header, and navfn doesn't depend upon FLTK, so stop installing
-  the header. Also fix navtest to actually build when FLTK is installed.
-* Contributors: Kyle Fazzari
-
 1.17.1 (2020-08-27)
 -------------------
 
