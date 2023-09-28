@@ -96,7 +96,8 @@ class Expander {
 
         int nx_, ny_, ns_; /**< size of grid, in pixels */
         bool unknown_;
-        unsigned char lethal_cost_, neutral_cost_;
+        unsigned char lethal_cost_;
+        unsigned char neutral_cost_; // 或称step_cost，即单格代价距离
         int cells_visited_;
         float factor_;
         PotentialCalculator* p_calc_;

@@ -56,7 +56,7 @@ class PotentialCalculator {
                 prev_potential = std::min(min_h, min_v);
             }
 
-            return prev_potential + cost;
+            return prev_potential + cost;   // 这样计算potential比较简单，但缺点是有些地方会不太连续，所以一般默认使用quadratic_calculator.cpp里的calculatePotential函数
         }
 
         /**

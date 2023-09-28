@@ -89,7 +89,7 @@ bool AStarExpansion::calculatePotentials(unsigned char* costs, double start_x, d
 
 // 添加点并更新代价函数
 void AStarExpansion::add(unsigned char* costs, float* potential, float prev_potential, int next_i, int end_x,
-                         int end_y) {
+                         int end_y) { // 这里next_i是指邻节点的索引
     // 超出范围， ns_为栅格总数
     if (next_i < 0 || next_i >= ns_)
         return;
@@ -100,6 +100,7 @@ void AStarExpansion::add(unsigned char* costs, float* potential, float prev_pote
     if(costs[next_i]>=lethal_cost_ && !(unknown_ && costs[next_i]==costmap_2d::NO_INFORMATION))
         return;
     // p_calc_->calculatePotential() 采用简单方法计算值为costs[next_i] + neutral_cost_+ prev_potentia  地图代价+单格距离代价(初始化为50)+之前路径代价 为G
+    // 一般工程商好像直接用这个cost[n] + step_cost * step_distance(上下左右为1，斜对角为1.414，或上下左右5：斜对角7)直接作为邻节点的G
     potential[next_i] = p_calc_->calculatePotential(potential, costs[next_i] + neutral_cost_, next_i, prev_potential);
     // 算出该点的x,y坐标
     int x = next_i % nx_, y = next_i / nx_;

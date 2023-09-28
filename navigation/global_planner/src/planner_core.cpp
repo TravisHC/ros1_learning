@@ -295,7 +295,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     p_calc_->setSize(nx, ny);
     planner_->setSize(nx, ny);
     path_maker_->setSize(nx, ny);
-    potential_array_ = new float[nx * ny];
+    potential_array_ = new float[nx * ny];  //  工程上需要主要能不能在堆上分配这么大内存，特别是在嵌入式系统上
 
     if(outline_map_)
         outlineMap(costmap_->getCharMap(), nx, ny, costmap_2d::LETHAL_OBSTACLE);
@@ -323,11 +323,11 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     }
 
     //  step 8 给路径添加方向
-    orientation_filter_->processPath(start, plan);
+    orientation_filter_->processPath(start, plan);  // 插值平滑，路径只搜出来了xy两个维度，这里补充方向角信息。工程上可以尝试自己实现，不难。ros写的有些地方有跳变。
 
     // 发布路径和可视化
     publishPlan(plan);
-    delete[] potential_array_;
+    delete[] potential_array_;  // 常用的查看内存泄露的方法，htop查看move_base的内存占用，看是否有异常增长。
     return !plan.empty();
 }
 
