@@ -11,7 +11,13 @@
 #ifndef _WAVEFRONT_H
 #define _WAVEFRONT_H
 
+// priority buffers
 #define PRIORITYBUFSIZE 10000
+// cost defs
+#define COST_UNKNOWN_ROS 255  // 255 is unknown cost
+#define COST_OBS 254          // 254 for forbidden regions
+#define COST_OBS_ROS 253      // ROS values of 253 are obstacles
+
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -20,40 +26,54 @@
 #include <global_planner/planner_core.h>
 #include <global_planner/expander.h>
 
-// cost defs
-#define COST_UNKNOWN_ROS 255  // 255 is unknown cost
-#define COST_OBS 254  // 254 for forbidden regions
-#define COST_OBS_ROS 253  // ROS values of 253 are obstacles
-
-// navfn cost values are set to
-// COST_NEUTRAL + COST_FACTOR * costmap_cost_value.
-// Incoming costmap cost values are in the range 0 to 252.
-// With COST_NEUTRAL of 50, the COST_FACTOR needs to be about 0.8 to
-// ensure the input values are spread evenly over the output range, 50
-// to 253.  If COST_FACTOR is higher, cost values will have a plateau
-// around obstacles and the planner will then treat (for example) the
-// whole width of a narrow hallway as equally undesirable and thus
-// will not plan paths down the center.
-
-#define COST_NEUTRAL 50  // Set this to "open space" value
-#define COST_FACTOR 0.8  // Used for translating costs in NavFn::setCostmap()
-
-// Define the cost type in the case that it is not set. However, this allows
-// clients to modify it without changing the file. Arguably, it is better to require it to
-// be defined by a user explicitly
-#ifndef COSTTYPE
-#define COSTTYPE unsigned char  // Whatever is used...
-#endif
-
-// potential defs
-#define POT_HIGH 1.0e10  // unassigned cell potential
-
-// priority buffers
-#define PRIORITYBUFSIZE 10000
+// clang-format off
+// inserting onto the priority blocks
+#define push_cur2(n)  { if (n>=0 && n<ns_ && !pending_[n] && getCost(costs, n)<lethal_cost_ && currSize_<PRIORITYBUFSIZE){ currBfr_[currSize_++]=n; pending_[n]=true; }}
+#define push_next2(n) { if (n>=0 && n<ns_ && !pending_[n] && getCost(costs, n)<lethal_cost_ &&    nextSize_<PRIORITYBUFSIZE){    nextBfr_[   nextSize_++]=n; pending_[n]=true; }}
+#define push_over2(n) { if (n>=0 && n<ns_ && !pending_[n] && getCost(costs, n)<lethal_cost_ &&    overSize_<PRIORITYBUFSIZE){    overBfr_[   overSize_++]=n; pending_[n]=true; }}
+// clang-format on
 
 namespace global_planner {
 class WavefrontExpansion : public Expander {
 public:
-    WavefrontExpansion()
-}
+    WavefrontExpansion(PotentialCalculator* p_calc, int nx, int ny);
+    ~WavefrontExpansion();
+    void setSize(int nx, int ny); /**< sets or resets the size of the map */
+
+    void setNeutralCost(unsigned char neutral_cost) {
+        neutral_cost_      = neutral_cost;
+        priorityIncrement_ = 2 * neutral_cost_;
+    }
+
+    void setPreciseStart(bool precise) {
+        precise_ = precise;
+    }
+
+    void updateCell(unsigned char* costs, float* potential, int n); /** updates the cell at index n */
+
+    float getCost(unsigned char* costs, int n) {
+        float c = costs[n];
+        if (c < lethal_cost_ - 1 || (unknown_ && c == 255)) {
+            c = c * factor_ + neutral_cost_;
+            if (c >= lethal_cost_)
+                c = lethal_cost_ - 1;
+            return c;
+        }
+        return lethal_cost_;
+    }
+
+    bool calculatePotentials(unsigned char* costs, double start_x, double start_y, double end_x, double end_y, int cycles, float* potential);
+
+    /** block priority buffers */
+    int *pb1_, *pb2_, *pb3_;             /**< storage buffers for priority blocks */
+    int *currBfr_, *nextBfr_, *overBfr_; /**< priority buffer block ptrs */
+    int currSize_, nextSize_, overSize_; /**< end points of arrays */
+    bool* pending_;                      /**< pending_ cells during propagation */
+    bool precise_;
+
+    /** block priority thresholds */
+    float threshold_;         /**< current threshold */
+    float priorityIncrement_; /**< priority threshold increment */
+};
 }  // namespace global_planner
+#endif

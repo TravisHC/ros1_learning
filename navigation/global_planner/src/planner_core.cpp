@@ -42,6 +42,7 @@
 
 #include <global_planner/dijkstra.h>
 #include <global_planner/astar.h>
+#include <global_planner/wavefront.h>
 #include <global_planner/grid_path.h>
 #include <global_planner/gradient_path.h>
 #include <global_planner/quadratic_calculator.h>
@@ -115,8 +116,8 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
         else
             p_calc_ = new PotentialCalculator(cx, cy); //
 
-        bool use_dijkstra;
-        private_nh.param("use_dijkstra", use_dijkstra, true);
+        bool use_dijkstra = false;
+        // private_nh.param("use_dijkstra", use_dijkstra, true);
         // 根据选择new出对应的planner实例. 计算“所有”的可行点
         if (use_dijkstra)
         {
@@ -127,7 +128,8 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
             planner_ = de;
         }
         else
-            planner_ = new AStarExpansion(p_calc_, cx, cy);   // A*算法
+            // planner_ = new AStarExpansion(p_calc_, cx, cy);   // A*算法
+            planner_ = new WavefrontExpansion(p_calc_, cx, cy);  // 测试自己写的算法
 
         bool use_grid_path;
         private_nh.param("use_grid_path", use_grid_path, false);
