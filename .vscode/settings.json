@@ -82,5 +82,13 @@
     },
     "ros.distro": "noetic",
     "cmake.sourceDirectory": "/home/travis/code/ros1_learning/navigation/amcl",
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "python.autoComplete.extraPaths": [
+        "/home/travis/catkin_test/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/travis/catkin_test/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ]
 }

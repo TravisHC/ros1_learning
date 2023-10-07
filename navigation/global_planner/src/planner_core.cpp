@@ -297,7 +297,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     p_calc_->setSize(nx, ny);
     planner_->setSize(nx, ny);
     path_maker_->setSize(nx, ny);
-    potential_array_ = new float[nx * ny];  //  工程上需要主要能不能在堆上分配这么大内存，特别是在嵌入式系统上
+    potential_array_ = new float[nx * ny];  //  工程上需要考虑主要能不能在堆上分配这么大内存，特别是在嵌入式系统上
 
     if(outline_map_)
         outlineMap(costmap_->getCharMap(), nx, ny, costmap_2d::LETHAL_OBSTACLE);
@@ -318,7 +318,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
             goal_copy.header.stamp = ros::Time::now();
             plan.push_back(goal_copy);
         } else {
-            ROS_ERROR("Failed to get a plan from potential when a legal potential was found. This shouldn't happen.");
+            ROS_ERROR("planner_core Failed to get a plan from potential when a legal potential was found. This shouldn't happen.");
         }
     }else{
         ROS_ERROR("Failed to get a plan.");
