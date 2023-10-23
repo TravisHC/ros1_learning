@@ -78,10 +78,11 @@
         "*.txx": "cpp",
         "filesystem": "cpp",
         "regex": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "*.inc": "cpp"
     },
     "ros.distro": "noetic",
-    "cmake.sourceDirectory": "/home/travis/code/ros1_learning/navigation/amcl",
+    "cmake.sourceDirectory": "/home/travis/catkin_test/src/ros1_learning/navigation/navigation",
     "C_Cpp.errorSquiggles": "disabled",
     "python.autoComplete.extraPaths": [
         "/home/travis/catkin_test/devel/lib/python3/dist-packages",

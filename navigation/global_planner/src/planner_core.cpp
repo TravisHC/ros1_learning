@@ -217,7 +217,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     auto t1 = ros::Time::now();
     return makePlan(start, goal, default_tolerance_, plan);
     auto t2 = ros::Time::now();
-    ROS_INFO("TEST: global planner using time: %d", t2 - t1);
+    ROS_INFO("TEST: global planner using time: %f", t2 - t1);
 }
 
 // 两个步骤完成路径的生成：
