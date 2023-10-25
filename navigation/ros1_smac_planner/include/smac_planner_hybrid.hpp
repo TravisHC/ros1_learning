@@ -7,9 +7,10 @@
  * 
  */
 
-class HybridAStarExpansion : public Expander
+#include "base_smac_planner.h"
+
+class HybridAStarExpansion : public BaseSmacPlanner
 {
 public:
     HybridAStarExpansion(PotentialCalculator *p_calc, int xs, int ys);
-    bool calculatePotentials(unsigned char *costs, double start_x, double start_y, double end_x, double end_y, int cycles, float *potential);
 }

@@ -1,0 +1,5 @@
+<library path="ros1_smac_planner">
+	<class name="ros1_smac_planner/SmacPlannerHybrid" type="ros1_smac_planner::SmacPlannerHybrid" base_class_type="ros1_core::GlobalPlanner">
+	  <description>Hybrid-A* SMAC planner</description>
+	</class>
+</library>

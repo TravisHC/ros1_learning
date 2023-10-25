@@ -88,7 +88,7 @@ public:
      * @param  name 全局规划器名字
      * @param  costmap_ros 代价地图ros封装类的指针
      */
-    void initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros);
+    void initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros) override;
 
     void initialize(std::string name, costmap_2d::Costmap2D* costmap, std::string frame_id);
 
@@ -100,7 +100,7 @@ public:
      * @return True : 找到全局路径
      */
     bool makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
-                  std::vector<geometry_msgs::PoseStamped>& plan);
+                  std::vector<geometry_msgs::PoseStamped>& plan) override;
 
     /**
      * @brief 根据目标点规划处全局路径
